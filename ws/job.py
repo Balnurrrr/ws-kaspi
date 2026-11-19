@@ -8,10 +8,14 @@ def run_job(jd, st):
     try:
         st.update(stage='Читаю накладную'); rows=pl.load_pl(jd+'/pl.xlsx')
         tpls={}
-        for f in sorted(os.listdir(jd+'/templates')):
-            i=kaspi.template_info(jd+'/templates/'+f); i['file']=jd+'/templates/'+f; tpls[i['category']]=i
-        unknown=[k for k in tpls if k not in cats.HANDLERS]
-        st['templates']=[{'file':os.path.basename(i['file']),'category':k,'supported':k in cats.HANDLERS} for k,i in tpls.items()]
+        base=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),'kaspi_templates')
+        for d in (base,jd+'/templates'):          # встроенные шаблоны; загруженные пользователем заменяют их
+            if not os.path.isdir(d): continue
+            for f in sorted(os.listdir(d)):
+                if not f.lower().endswith('.xlsm'): continue
+                i=kaspi.template_info(d+'/'+f); i['file']=d+'/'+f; tpls[i['category']]=i
+        unknown=[]
+        st['templates']=[]
         rows=[r for r in rows]
         # фото: нужны только по артикулам, которые пойдут в поддерживаемые категории (простота: по всем)
         cols=collections.defaultdict(set)

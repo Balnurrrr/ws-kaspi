@@ -3,7 +3,7 @@ import os, uuid, json, shutil, threading, time, secrets, re
 from functools import wraps
 from flask import Flask, request, redirect, url_for, session, render_template, jsonify, send_from_directory, abort
 from werkzeug.utils import secure_filename
-from ws import job
+from ws import job, pl as plmod, classify
 DATA=os.environ.get('WS_DATA','/tmp/ws-data'); os.makedirs(DATA+'/jobs',exist_ok=True)
 USERS=dict(p.split(':',1) for p in os.environ.get('WS_USERS','admin:admin').split(',') if ':' in p)   # "анна:пароль1,олег:пароль2"
 app=Flask(__name__); app.secret_key=os.environ.get('SECRET_KEY') or secrets.token_hex(16)
@@ -27,19 +27,30 @@ def login():
 def logout(): session.clear(); return redirect('/login')
 @app.route('/')
 @login_required
-def index(): return render_template('index.html',user=session['u'])
+def index(): return render_template('index.html',user=session['u'],cats=[c.replace('Master - ','') for c in job.cats.HANDLERS])
 def cleanup():
     for d in os.listdir(DATA+'/jobs'):
         p=f'{DATA}/jobs/{d}'
         if time.time()-os.path.getmtime(p)>24*3600: shutil.rmtree(p,ignore_errors=True); JOBS.pop(d,None)
-@app.route('/start',methods=['POST'])
+@app.route('/analyze',methods=['POST'])
 @login_required
-def start():
+def analyze():
     cleanup()
-    pl=request.files.get('pl'); tpls=[f for f in request.files.getlist('tpl') if f.filename]
-    if not pl or not pl.filename or not tpls: return render_template('index.html',user=session['u'],err='Нужна накладная (PL) и хотя бы один шаблон Kaspi.')
-    jid=uuid.uuid4().hex[:12]; jd=f'{DATA}/jobs/{jid}'; os.makedirs(jd+'/templates'); os.makedirs(jd+'/uploads')
-    pl.save(jd+'/pl.xlsx')
+    f=request.files.get('pl')
+    if not f or not f.filename: return render_template('index.html',user=session['u'],err='Загрузите накладную (PL).')
+    jid=uuid.uuid4().hex[:12]; jd=f'{DATA}/jobs/{jid}'; os.makedirs(jd+'/templates'); os.makedirs(jd+'/uploads'); f.save(jd+'/pl.xlsx')
+    try: rows=plmod.load_pl(jd+'/pl.xlsx')
+    except Exception as e:
+        shutil.rmtree(jd,ignore_errors=True); return render_template('index.html',user=session['u'],err=f'Не удалось прочитать накладную: {e}')
+    res=classify.analyze(rows)
+    return render_template('analyze.html',user=session['u'],jid=jid,res=res,total=len(rows),fname=f.filename,
+                           need=[r for r in res if r['status']=='need'])
+@app.route('/start/<jid>',methods=['POST'])
+@login_required
+def start(jid):
+    jd=f'{DATA}/jobs/{jid}'
+    if not re.fullmatch(r'[0-9a-f]{12}',jid) or not os.path.exists(jd+'/pl.xlsx'): abort(404)
+    tpls=[f for f in request.files.getlist('tpl') if f.filename]
     for i,f in enumerate(tpls): f.save(f'{jd}/templates/{i}_{secure_filename(f.filename) or "t.xlsm"}')
     links=[l.strip() for l in re.split(r'[\s,]+',request.form.get('links','')) if l.strip().startswith('http')]
     for f in request.files.getlist('photos'):

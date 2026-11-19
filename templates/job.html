@@ -10,7 +10,6 @@ h+='<div class="card"><h2>Фото</h2><p>Найдены для '+d.photos.with+
 (d.warnings||[]).forEach(w=>h+='<p class="err">'+esc(w)+'</p>');
 d.results.forEach(r=>{h+='<div class="card"><h2>'+esc(r.category.replace('Master - ',''))+' — '+r.positions+' товаров</h2>';
 r.zips.forEach(z=>h+='<div class="dl"><span>'+esc(z.zip)+' · '+z.articles+' артикулов · '+z.mb+' МБ</span><a class="btn" href="/download/'+jid+'/'+encodeURIComponent(z.zip)+'">Скачать</a></div>');h+='</div>'});
-d.templates.filter(t=>!t.supported).forEach(t=>h+='<p class="err">Для «'+esc(t.category)+'» правил пока нет (файл '+esc(t.file)+').</p>');
 if(d.skipped)h+='<div class="card"><h2>Не сделано: '+d.skipped+'</h2><div class="dl"><span>Список с причинами</span><a class="btn" href="/download/'+jid+'/Не_сделано.xlsx">Скачать</a></div></div>'}
 document.getElementById('res').innerHTML=h;document.querySelector('h1').textContent=d.error?'Не получилось':'Готово'}
 poll()</script>{% endblock %}
