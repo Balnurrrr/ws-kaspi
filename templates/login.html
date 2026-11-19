@@ -1,0 +1,2 @@
+{% extends 'base.html' %}{% block c %}<h1>Вход</h1><p class="s">Каспи-шаблоны Women'Secret</p>
+<form method="post" class="card"><p><input type="text" name="u" placeholder="Логин" autofocus></p><p><input type="password" name="p" placeholder="Пароль"></p>{% if err %}<p class="err">{{err}}</p>{% endif %}<button>Войти</button></form>{% endblock %}

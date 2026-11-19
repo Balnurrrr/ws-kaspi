@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ws-kaspi
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 1 --threads 4 --timeout 600 -b 0.0.0.0:$PORT app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: WS_USERS
+        sync: false   # "анна:пароль1,олег:пароль2"
+      - key: SECRET_KEY
+        generateValue: true
