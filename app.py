@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os, uuid, json, shutil, threading, time, secrets, re
 from functools import wraps
-from flask import Flask, request, redirect, url_for, session, render_template, jsonify, send_from_directory, abort
+from flask import Flask, request, redirect, url_for, session, render_template, jsonify, send_from_directory, send_file, abort
 from werkzeug.utils import secure_filename
 from ws import job, pl as plmod, classify
 DATA=os.environ.get('WS_DATA','/tmp/ws-data'); os.makedirs(DATA+'/jobs',exist_ok=True)
@@ -70,6 +70,17 @@ def status(jid):
     st=JOBS.get(jid) or abort(404)
     if st['user']!=session['u']: abort(403)
     return jsonify({k:v for k,v in st.items() if k!='trace'})
+@app.route('/download_all/<jid>')
+@login_required
+def download_all(jid):
+    import zipfile, io
+    st=JOBS.get(jid) or abort(404)
+    if st['user']!=session['u']: abort(403)
+    out=f'{DATA}/jobs/{jid}/out'; path=f'{DATA}/jobs/{jid}/all.zip'
+    with zipfile.ZipFile(path,'w',zipfile.ZIP_STORED) as z:
+        for f in sorted(os.listdir(out)):
+            if f.endswith('.zip') or f.endswith('.xlsx'): z.write(f'{out}/{f}',f)
+    return send_file(path,as_attachment=True,download_name='Kaspi-все-архивы.zip',mimetype='application/zip')
 @app.route('/download/<jid>/<name>')
 @login_required
 def download(jid,name):

@@ -2,7 +2,7 @@
 import os, json, traceback, zipfile, collections
 import openpyxl
 from openpyxl.styles import Font, PatternFill
-from . import pl, photos, kaspi, cats
+from . import pl, photos, kaspi, cats, cats_more
 def run_job(jd, st):
     """jd — папка задания: pl.xlsx, templates/*.xlsm, uploads/*, links.json. st — словарь статуса (для страницы прогресса)."""
     try:
@@ -30,6 +30,7 @@ def run_job(jd, st):
             for f in os.listdir(jd+'/uploads'): up[f]=open(jd+'/uploads/'+f,'rb').read()
         def prog(i,n,a): st.update(stage=f'Ищу фото: {i} из {n} артикулов',done=i,total=n)
         rep=photos.run(cols,jd+'/img',yfiles,up,prog)
+        if photos.SITE_STATE['dead']: st.setdefault('warnings',[]).append('Официальный сайт Women\'Secret не открылся с сервера: фото взяты только из Яндекс.Диска и ваших файлов.')
         st['photos']={'with':sum(1 for v in rep.values() if v['n']),'without':sum(1 for v in rep.values() if not v['n'])}
         out=jd+'/out'; os.makedirs(out,exist_ok=True); results=[]; allskips=[]
         for cat,i in tpls.items():
@@ -42,6 +43,19 @@ def run_job(jd, st):
             results.append({'category':cat,'positions':len(table),'zips':[{**z,'zip':os.path.basename(z['zip'])} for z in res]})
             for s in ctx.skips: s['Категория']=cat
             allskips+=ctx.skips
+        # категории без правил или без шаблона
+        from . import classify
+        have={k:i for k,i in tpls.items()}
+        for r in rows:
+            name,tpl,where=classify.label_of(r['DESCRIPTION'])
+            if name is None: why='категория не распознана'
+            elif not tpl: why=f'нет шаблона Kaspi для «{name}»'
+            else:
+                tc=[k for k,i in tpls.items() if os.path.basename(i['file']).endswith(tpl) or os.path.basename(i['file'])==tpl]
+                if not tc: why=f'не загружен шаблон Kaspi для «{name}»'
+                elif tc[0] in cats.HANDLERS: continue
+                else: why=f'сайт пока не умеет заполнять «{name}»'
+            allskips.append({'Категория':name or '—','Артикул':r['STYLE'],'Описание':r['DESCRIPTION'].strip(),'Модель':r.get('PRODUCT MODEL',''),'Размер':r['SIZE'],'Цвет':r['COLOR DESCRIP'],'EAN':r['EAN STYLE'],'Причина':why})
         # то, что не попало ни в одну категорию (нет шаблона)
         if allskips or unknown:
             wb=openpyxl.Workbook(); ws=wb.active; ws.title='Не сделано'

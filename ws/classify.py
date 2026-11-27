@@ -27,7 +27,7 @@ def label_of(desc):
     for rx,name,tpl,where in RULES:
         if re.search(rx,d): return name,tpl,where
     return None,None,None
-HANDLED_TPL={'Women-bras-import-template.xlsm','Women-panties-import-template.xlsm','Women-nightwear-import-template.xlsm'}
+HANDLED_TPL=None
 def analyze(rows):
     g=collections.OrderedDict()
     for r in rows:
@@ -38,10 +38,7 @@ def analyze(rows):
     out=[]
     for e in g.values():
         tpl=e['tpl']; have=bool(tpl) and os.path.exists(os.path.join(BASE,tpl))
-        if tpl in HANDLED_TPL: status='ready'
-        elif have: status='soon'
-        elif tpl or e['where']: status='need'
-        else: status='unknown'
+        status='ok' if have else 'need'
         out.append({'name':e['name'],'articles':len(e['styles']),'positions':e['positions'],'tpl':tpl,'where':e['where'],'status':status,'examples':sorted(e['examples'])[:3]})
-    order={'ready':0,'soon':1,'need':2,'unknown':3}
+    order={'ok':0,'need':1}
     return sorted(out,key=lambda x:(order[x['status']],-x['positions']))

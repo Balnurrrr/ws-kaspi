@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Фото: 1) официальный сайт Women'Secret, 2) публичные папки Яндекс.Диска, 3) загруженные файлы. Каждое фото проверяется."""
-import json, re, os, shutil, io, ssl, urllib.request, urllib.parse
+import json, re, os, shutil, io, ssl, urllib.request, urllib.parse, urllib.error
 try:
     import certifi; CTX=ssl.create_default_context(cafile=certifi.where())
 except Exception: CTX=None
@@ -9,13 +9,20 @@ from PIL import Image
 KINDS=['FM','D1','D2','D3','TM','D4','D8','D5','FL']
 SITE='https://womensecret.com/dw/image/v2/AAYL_PRD/on/demandware.static/-/Sites-gc-ws-master-catalog/default/images/hi-res/'
 UA={'User-Agent':'Mozilla/5.0'}
+SITE_STATE={'fail':0,'ok':0,'dead':False}
 def http(url,timeout=40):
     return urllib.request.urlopen(urllib.request.Request(url,headers=UA),timeout=timeout,context=CTX).read()
 def valid(b):
     try:
         im=Image.open(io.BytesIO(b)); im.verify(); return len(b)>5000
     except Exception: return False
+import time
+_YC={}
 def ydisk_list(public_key,path='/'):
+    c=_YC.get(public_key)
+    if c and time.time()-c[0]<6*3600: return dict(c[1])
+    r=_ydisk_list(public_key,path); _YC[public_key]=(time.time(),r); return dict(r)
+def _ydisk_list(public_key,path='/'):
     """все файлы публичной папки (с подпапками): {имя: (public_key, path)}"""
     out={}
     def walk(p):
@@ -30,9 +37,9 @@ def ydisk_list(public_key,path='/'):
             if len(items)<200: break
             off+=200
     walk(path); return out
-def ydisk_get(public_key,path):
+def ydisk_get(public_key,path):  # таймауты короткие, чтобы не зависать
     u='https://cloud-api.yandex.net/v1/disk/public/resources/download?'+urllib.parse.urlencode({'public_key':public_key,'path':path})
-    return http(json.loads(http(u))['href'],120)
+    return http(json.loads(http(u,20))['href'],60)
 def get_article(a,colours,root,yfiles,uploaded):
     code=('0'+a) if len(a)==6 else a
     d=f'{root}/{a}'; shutil.rmtree(d,ignore_errors=True); os.makedirs(d); got=[]; src=''
@@ -41,11 +48,15 @@ def get_article(a,colours,root,yfiles,uploaded):
     for c in sorted(colours):                      # 1) сайт бренда
         for k in KINDS:
             if len(got)>=5: break
-            for _ in range(2):
-                try:
-                    b=http(f'{SITE}P_{code}{c}{k}.jpg')
-                    if valid(b): save(b); src='сайт'; break
-                except Exception: pass
+            if SITE_STATE['dead']: break
+            try:
+                b=http(f'{SITE}P_{code}{c}{k}.jpg',timeout=8)
+                SITE_STATE['ok']+=1
+                if valid(b): save(b); src='сайт'
+            except urllib.error.HTTPError: SITE_STATE['ok']+=1      # 404 = сайт отвечает, такого фото нет
+            except Exception:
+                SITE_STATE['fail']+=1
+                if SITE_STATE['fail']>=8 and SITE_STATE['ok']==0: SITE_STATE['dead']=True   # сайт WS недоступен с этого сервера
         if got: break
     if not got:                                    # 2) папки Яндекс.Диска и загруженные файлы
         pat=re.compile(r'(?:[0-9a-f]{8}-)?(?:P_)?%s(?!\d)'%re.escape(code if code in ''.join(yfiles) else a))
@@ -57,7 +68,8 @@ def get_article(a,colours,root,yfiles,uploaded):
                 if valid(b): save(b,n.rsplit('.',1)[-1].lower()); src='папка'
             except Exception: pass
     return a,len(got),src
-def run(cols,root,yfiles,uploaded,progress=None,workers=6):
+def run(cols,root,yfiles,uploaded,progress=None,workers=16):
+    SITE_STATE.update(fail=0,ok=0,dead=False)
     os.makedirs(root,exist_ok=True); rep={}
     with ThreadPoolExecutor(workers) as ex:
         for i,(a,n,s) in enumerate(ex.map(lambda kv:get_article(kv[0],kv[1],root,yfiles,uploaded),sorted(cols.items())),1):

@@ -1,17 +1,10 @@
 {% extends 'base.html' %}{% block c %}
-<div class="top"><span>👋 {{user}}</span><a href="/">← Другая накладная</a></div>
-<h1>Что в накладной</h1><p class="s">{{fname}} · {{total}} товаров (артикул × размер)</p>
-<div class="card"><h2>Категории</h2>
-{% for r in res %}<div class="cat {{r.status}}">
-<div><b>{% if r.status=='ready' %}✅{% elif r.status=='soon' %}🟡{% elif r.status=='need' %}📥{% else %}❓{% endif %} {{r.name}}</b> <span class="mut">· {{r.articles}} артикулов, {{r.positions}} строк</span>
-<div class="mut">{% if r.status=='ready' %}Шаблон уже на сайте, заполнится автоматически.
-{% elif r.status=='soon' %}Шаблон на сайте есть, но правила заполнения ещё готовятся — пока попадёт в список «Не сделано».
-{% elif r.status=='need' %}Нужен шаблон из кабинета Kaspi: <b>{{r.where}}</b> {% if r.tpl %}(файл {{r.tpl}}){% endif %}. Загрузите его ниже.
-{% else %}Не знаю такую категорию ({{r.examples|join(', ')}}). Напишите Балнур — добавим.{% endif %}</div></div></div>{% endfor %}</div>
+<div class="nav"><span>{{user}}</span><a href="/">Другая накладная</a></div>
+<h1>Категории</h1><p class="lead">{{fname}} · {{total}} товаров</p>
+<div class="card">{% for r in res %}<div class="row"><div><div class="name">{{r.name}}</div><div class="meta">{{r.articles}} {{'артикул' if r.articles==1 else 'артикулов'}} · {{r.positions}} строк</div></div>{% if r.status=='need' %}<span class="pill need">Нужен шаблон</span>{% endif %}</div>{% endfor %}</div>
 <form method="post" action="/start/{{jid}}" enctype="multipart/form-data">
-{% if need %}<div class="card"><span class="n">2</span><h2>Загрузите недостающие шаблоны</h2><p class="h">В кабинете Kaspi → Товары → Загрузить товары → скачайте шаблон для категорий со значком 📥 и добавьте сюда. Можно пропустить — такие товары попадут в «Не сделано».</p><input type="file" name="tpl" accept=".xlsm" multiple></div>{% endif %}
-<div class="card"><span class="n">{{3 if need else 2}}</span><h2>Фото</h2><p class="h">Сначала ищутся на официальном сайте Women'Secret автоматически. Если там нет — из ваших источников (необязательно).</p>
-<details><summary>Добавить фото из Яндекс.Диска или с компьютера</summary>
-<p><b>Ссылки на папки Яндекс.Диска</b> (по одной в строке)<textarea name="links" placeholder="https://disk.yandex.ru/d/..."></textarea></p>
-<p><b>Файлы с компьютера</b><input type="file" name="photos" accept="image/*" multiple></p></details></div>
-<button class="big">✨ Заполнить</button></form>{% endblock %}
+<div class="card"><h2>Шаблоны Kaspi</h2><p class="meta" style="margin:-4px 0 12px">{% if need %}Не хватает шаблонов для: {{need|map(attribute='name')|map('lower')|join(', ')}}. Загрузите их здесь.{% else %}Нужные шаблоны уже есть на сайте. Если Kaspi обновил шаблон, загрузите новый здесь.{% endif %}</p><input type="file" name="tpl" accept=".xlsm" multiple></div>
+<div class="card"><details><summary>Фото из Яндекс.Диска или с компьютера</summary>
+<textarea name="links" placeholder="Ссылки на папки Яндекс.Диска, по одной в строке"></textarea>
+<p class="meta" style="margin:12px 0 6px">Или файлы с компьютера</p><input type="file" name="photos" accept="image/*" multiple></details></div>
+<button class="btn">Заполнить</button></form>{% endblock %}

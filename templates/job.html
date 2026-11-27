@@ -1,15 +1,21 @@
-{% extends 'base.html' %}{% block c %}<h1>Идёт работа</h1><p class="s" id="stage">…</p><div class="bar"><i id="b"></i></div><div id="res"></div>
+{% extends 'base.html' %}{% block c %}
+<div class="nav"><span></span><a href="/">Новая накладная</a></div>
+<h1 id="title">Идёт работа</h1><p class="lead" id="stage">…</p><div class="bar"><i id="b" style="width:0;transition:width .3s"></i></div><div id="res"></div>
 <script>
 const jid="{{jid}}",esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 async function poll(){let d;try{d=await (await fetch('/status/'+jid)).json()}catch(e){setTimeout(poll,3000);return}
 document.getElementById('stage').textContent=d.stage;if(d.total)document.getElementById('b').style.width=(100*d.done/d.total)+'%';
 if(!d.finished){setTimeout(poll,1500);return}
 document.getElementById('b').style.width='100%';let h='';
-if(d.error){h='<p class="err">Ошибка: '+esc(d.error)+'</p>'}else{
-h+='<div class="card"><h2>Фото</h2><p>Найдены для '+d.photos.with+' артикулов; без фото: '+d.photos.without+'</p></div>';
+if(d.error){document.getElementById('title').textContent='Не получилось';h='<p class="err">'+esc(d.error)+'</p>'}else{
+document.getElementById('title').textContent='Готово';document.getElementById('stage').textContent='Архивы можно сразу загружать в Kaspi.';
+const items=d.results.reduce((s,r)=>s+r.positions,0);
+h+='<div class="stats"><div class="stat"><b>'+d.photos.with+'</b><span>артикулов с фото</span></div><div class="stat"><b>'+items+'</b><span>товаров в архивах</span></div><div class="stat"><b>'+d.photos.without+'</b><span>артикулов без фото</span></div></div>';
 (d.warnings||[]).forEach(w=>h+='<p class="err">'+esc(w)+'</p>');
-d.results.forEach(r=>{h+='<div class="card"><h2>'+esc(r.category.replace('Master - ',''))+' — '+r.positions+' товаров</h2>';
-r.zips.forEach(z=>h+='<div class="dl"><span>'+esc(z.zip)+' · '+z.articles+' артикулов · '+z.mb+' МБ</span><a class="btn" href="/download/'+jid+'/'+encodeURIComponent(z.zip)+'">Скачать</a></div>');h+='</div>'});
-if(d.skipped)h+='<div class="card"><h2>Не сделано: '+d.skipped+'</h2><div class="dl"><span>Список с причинами</span><a class="btn" href="/download/'+jid+'/Не_сделано.xlsx">Скачать</a></div></div>'}
-document.getElementById('res').innerHTML=h;document.querySelector('h1').textContent=d.error?'Не получилось':'Готово'}
+if(d.results.some(r=>r.zips.length))h+='<a class="btn" style="margin-bottom:14px" href="/download_all/'+jid+'">Скачать всё одним архивом</a>';
+h+='<div class="card">';
+d.results.forEach(r=>r.zips.forEach(z=>h+='<div class="dl"><div><div class="name">'+esc(z.zip)+'</div><div class="meta">'+z.articles+' артикулов · '+z.rows+' товаров · '+z.mb+' МБ</div></div><a class="btn ghost small" href="/download/'+jid+'/'+encodeURIComponent(z.zip)+'">Скачать</a></div>'));
+if(d.skipped)h+='<div class="dl"><div><div class="name">Не_сделано.xlsx</div><div class="meta">'+d.skipped+' строк с причинами</div></div><a class="btn ghost small" href="/download/'+jid+'/Не_сделано.xlsx">Скачать</a></div>';
+h+='</div>'}
+document.getElementById('res').innerHTML=h}
 poll()</script>{% endblock %}

@@ -18,14 +18,18 @@ def build(template,table,ncols,outdir,name,imgroot,limit=85e6):
     os.makedirs(outdir,exist_ok=True); tmp=outdir+'/_img'; shutil.rmtree(tmp,ignore_errors=True)
     arts=sorted({t['D'] for t in table}); sizes={}
     for dcode in arts:
-        a=dcode.split('-')[0]; d=f'{tmp}/{dcode}'; n=0
+        a=dcode if os.path.isdir(f'{imgroot}/{dcode}') else dcode.split('-')[0]; d=f'{tmp}/{dcode}'; n=0
         src=sorted(glob.glob(f'{imgroot}/{a}/*'),key=lambda p:int(os.path.basename(p).split('.')[0]))[:5]
         os.makedirs(d,exist_ok=True)
         for f in src:
             try:
-                im=Image.open(f).convert('RGB'); im.thumbnail((1200,1800)); n+=1
-                im.save(f'{d}/{n}.jpeg',quality=85,optimize=True,progressive=True)
-            except Exception: pass
+                n+=1; dst=f'{d}/{n}.jpeg'
+                if f.lower().endswith(('.jpg','.jpeg')):
+                    with Image.open(f) as im: w,h=im.size
+                    if w<=2000 and h<=3000: shutil.copyfile(f,dst); continue     # уже подходит — без перекодирования (быстро)
+                im=Image.open(f); im.draft('RGB',(1600,2400)); im=im.convert('RGB'); im.thumbnail((1600,2400))
+                im.save(dst,quality=85)
+            except Exception: n-=1
         sizes[dcode]=sum(os.path.getsize(p) for p in glob.glob(d+'/*'))
     parts=[];cur=[];tot=0
     for a in arts:
